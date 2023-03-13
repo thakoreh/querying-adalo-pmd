@@ -9,12 +9,35 @@ class Content(BaseModel):
     desc: str
     internaldesc: str
 
+class DataContent(BaseModel):
+    id: int
+    name: str
+    location: str
+    image_of_place: bytes
+    reviews: str
+    description: str
+    internaluse_user: str
+    ratings: int
+    address: str
+    place_id: str
+    latitude: float
+    longitude: float
+    next_id: float
+    is_check: bool
+    phone: str
+    is_open_now: bool
+    created_at: str
+    updated_at: str
+
 class ItemList(BaseModel):
     time:str
     items: List[Content]
 
-@app.get("/{apikey}/{nextid}")
-def searchRecordsWithNextID(nextid,apikey):
+class dataList(BaseModel):
+    data: List[DataContent]
+
+@app.get("/{openaikey}/{apikey}/{nextid}/{time}")
+def searchRecordsWithNextID(nextid,openaikey,apikey,time):
     our_result_records = []
     apiURL = "https://api.adalo.com/v0/apps/8dbf054c-3069-4216-a8b3-4ece69d7625a/collections/t_8voklgehc3pmpv1vs24tut1p1"
     headers = {'Content-Type':'application/json',"Authorization":f"Bearer {apikey}"}
@@ -28,18 +51,18 @@ def searchRecordsWithNextID(nextid,apikey):
         responseJSON = response.json()
         recordsPresent = responseJSON["records"]
         our_result_records.extend(list(filter(lambda x:float(x['NextId'])==float(nextid) and x['is_check']==True,recordsPresent)))
-    return our_result_records
-
-
-
-@app.post("/askchatgpt",status_code=201)
-async def makePlanWithGPT(data:ItemList=Body(...,embed=True),status_code=201):
+    
+    #generating prompt
     content = f"""Here are the places :\n"""
-    for d in data.items:
-        content += f"{d.name},{d.desc},{d.internaldesc}\n"
-    content += f"""I want you to plan a romantic date with my wife keeping above places in mind which starts at {data.time}. It is not necessary to include all the places. You can also come up with alternate plans."""
-    data = {
+    for eachRecord in our_result_records:
+        content += f"{eachRecord['Name']},{eachRecord['Description']},{eachRecord['InternalUse_User']}\n"
+
+    content += f"""I want you to plan a romantic date with my partner keeping above places in mind which starts at {time}. It is not necessary to include all the places. You can also come up with alternate plans."""
+    prompt = {
         "model": "gpt-3.5-turbo",
-        "messages": [{"role": "user", "content": f"{content}"}] 
+        "messages": [{"role": "user", "content": content}] 
     }
-    return data
+    gptheaders = {'Content-Type':'application/json',"Authorization":f"Bearer {openaikey}"}
+    url='https://api.openai.com/v1/chat/completions'
+    responseCHATGPT = requests.post(url,headers=gptheaders,json=prompt)
+    return responseCHATGPT.json()
